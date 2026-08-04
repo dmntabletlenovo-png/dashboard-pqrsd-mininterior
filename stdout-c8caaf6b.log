@@ -1,0 +1,201 @@
+                  backgroundColor: showFilters ? colors.secondary : 'transparent',
+                  color: showFilters ? 'white' : colors.textMuted,
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                <Filter size={16} />
+                <span className="text-sm">Filtros</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* Filters Panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-b"
+            style={{ backgroundColor: colors.card, borderColor: colors.border }}
+          >
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Serie Documental
+                  </label>
+                  <select
+                    value={filtros.serie}
+                    onChange={(e) => setFiltros({ ...filtros, serie: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porSerie).sort().map(serie => (
+                      <option key={serie} value={serie}>{serie}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Rango de Días
+                  </label>
+                  <select
+                    value={filtros.rangoDias}
+                    onChange={(e) => setFiltros({ ...filtros, rangoDias: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todos</option>
+                    {Object.keys(data.estadisticas.porRangoDias).filter(r => r).map(rango => (
+                      <option key={rango} value={rango}>{rango}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Oficina
+                  </label>
+                  <select
+                    value={filtros.oficina}
+                    onChange={(e) => setFiltros({ ...filtros, oficina: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porOficina).sort().map(oficina => (
+                      <option key={oficina} value={oficina}>{oficina}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Búsqueda
+                  </label>
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" 
+                            style={{ color: colors.textMuted }} />
+                    <input
+                      type="text"
+                      value={filtros.busqueda}
+                      onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
+                      placeholder="Buscar por asunto, radicado o firmante..."
+                      className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-xs" style={{ color: colors.textMuted }}>
+                  Mostrando {documentosFiltrados.length.toLocaleString()} de {data.estadisticas.total.toLocaleString()} documentos
+                </p>
+                <button
+                  onClick={() => setFiltros({ serie: '', subserie: '', oficina: '', rangoDias: '', busqueda: '' })}
+                  className="text-xs px-3 py-1 rounded"
+                  style={{ color: colors.secondary }}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <KPICard
+            title="Total Documentos"
+            value={statsFiltrados.total.toLocaleString()}
+            icon={FileText}
+            color={colors.secondary}
+            subtitle="Registros en el sistema"
+          />
+          <KPICard
+            title="Documentos Vencidos"
+            value={statsFiltrados.documentosVencidos.toLocaleString()}
+            icon={AlertTriangle}
+            color={colors.danger}
+            subtitle="Requieren atención urgente"
+          />
+          <KPICard
+            title="Pendientes"
+            value={statsFiltrados.documentosPendientes.toLocaleString()}
+            icon={Clock}
+            color={colors.warning}
+            subtitle="En proceso de trámite"
+          />
+          <KPICard
+            title="Promedio Días"
+            value={statsFiltrados.diasPromedio}
+            icon={Activity}
+            color={colors.success}
+            subtitle="Tiempo promedio de procesamiento"
+          />
+        </div>
+        
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto">
+          {[
+            { id: 'overview', label: 'Vista General', icon: BarChart3 },
+            { id: 'analysis', label: 'Análisis', icon: PieChart },
+            { id: 'alerts', label: `Alertas (${alertas.length})`, icon: Bell },
+            { id: 'export', label: 'Exportar', icon: Download }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors"
+              style={{
+                backgroundColor: activeTab === tab.id ? colors.secondary : colors.card,
+                color: activeTab === tab.id ? 'white' : colors.textMuted,
+                border: `1px solid ${activeTab === tab.id ? colors.secondary : colors.border}`
+              }}
+            >
+              <tab.icon size={16} />
+              <span className="text-sm">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+        
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'overview' && (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            >
+              {/* Distribution by Series */}
+              <div className="lg:col-span-2 p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <BarChart3 size={18} style={{ color: colors.secondary }} />
+                  Distribución por Serie Documental
+                </h3>
+                <BarChart
+                  data={Object.entries(statsFiltrados.porSerie)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([name, count]) => ({ name, count }))}
+                  maxValue={Math.max(...Object.values(statsFiltrados.porSerie))}
+                  labelKey="name"
+                  valueKey="count"
+                  color={colors.secondary}
+                />
+              </div>
+              
+              {/* Executive Summary */}
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>

@@ -1,0 +1,151 @@
+              transition={{ duration: 0.8, delay: index * 0.05 }}
+              className="h-full rounded-full"
+              style={{ backgroundColor: color }}
+            />
+          </div>
+          <span className="text-sm font-semibold w-16 text-right" style={{ color: colors.text }}>
+            {item[valueKey].toLocaleString()}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Line Chart Component
+const LineChart = ({ data, color = colors.secondary }: { data: Record<string, number>; color?: string }) => {
+  const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+  const maxValue = Math.max(...entries.map(e => e[1]));
+  
+  return (
+    <div className="relative h-48">
+      <svg className="w-full h-full" viewBox="0 0 400 150" preserveAspectRatio="none">
+        {/* Grid lines */}
+        {[0, 1, 2, 3, 4].map(i => (
+          <line key={i} x1="0" y1={i * 37.5} x2="400" y2={i * 37.5} 
+                stroke={colors.border} strokeWidth="1" opacity="0.3" />
+        ))}
+        
+        {/* Line */}
+        <polyline
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          points={entries.map((e, i) => {
+            const x = (i / (entries.length - 1)) * 380 + 10;
+            const y = 150 - (e[1] / maxValue) * 140;
+            return `${x},${y}`;
+          }).join(' ')}
+        />
+        
+        {/* Area under line */}
+        <polygon
+          fill={`${color}30`}
+          points={`10,150 ${entries.map((e, i) => {
+            const x = (i / (entries.length - 1)) * 380 + 10;
+            const y = 150 - (e[1] / maxValue) * 140;
+            return `${x},${y}`;
+          }).join(' ')} ${390},150`}
+        />
+        
+        {/* Dots */}
+        {entries.map((e, i) => {
+          const x = (i / (entries.length - 1)) * 380 + 10;
+          const y = 150 - (e[1] / maxValue) * 140;
+          return (
+            <circle key={i} cx={x} cy={y} r="3" fill={color} />
+          );
+        })}
+      </svg>
+      
+      {/* Labels */}
+      <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2">
+        {entries.filter((_, i) => i % Math.ceil(entries.length / 6) === 0).map(([key], i) => (
+          <span key={i} className="text-xs" style={{ color: colors.textMuted }}>
+            {key.split('-')[1]}/{key.split('-')[0].slice(2)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Heat Map Component
+const HeatMap = ({ oficinas }: { oficinas: Record<string, number> }) => {
+  const entries = Object.entries(oficinas)
+    .filter(([key]) => key.length > 5)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+  const maxValue = Math.max(...entries.map(e => e[1]));
+  
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {entries.map(([oficina, count], index) => {
+        const intensity = count / maxValue;
+        const bg = `rgba(37, 99, 235, ${0.2 + intensity * 0.8})`;
+        const shortName = oficina.replace('DIRECCION DE ', '').replace('GRUPO DE ', '').substring(0, 25);
+        
+        return (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.03 }}
+            className="p-2 rounded-lg cursor-pointer hover:scale-105 transition-transform"
+            style={{ backgroundColor: bg }}
+            title={`${oficina}: ${count.toLocaleString()} documentos`}
+          >
+            <p className="text-xs font-medium truncate" style={{ color: colors.text }}>
+              {shortName}
+            </p>
+            <p className="text-lg font-bold" style={{ color: colors.text }}>
+              {count.toLocaleString()}
+            </p>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Alert Item Component
+const AlertItem = ({ 
+  titulo, 
+  descripcion, 
+  tipo, 
+  fecha 
+}: { 
+  titulo: string; 
+  descripcion: string; 
+  tipo: 'warning' | 'danger' | 'info'; 
+  fecha: string;
+}) => {
+  const bgColor = tipo === 'danger' ? '#7f1d1d' : tipo === 'warning' ? '#78350f' : '#1e3a5f';
+  const borderColor = tipo === 'danger' ? colors.danger : tipo === 'warning' ? colors.warning : colors.secondary;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="p-4 rounded-lg border-l-4"
+      style={{ backgroundColor: bgColor, borderLeftColor: borderColor }}
+    >
+      <div className="flex items-start gap-3">
+        <AlertTriangle size={18} style={{ color: borderColor }} className="mt-0.5" />
+        <div className="flex-1">
+          <p className="font-semibold text-sm" style={{ color: colors.text }}>{titulo}</p>
+          <p className="text-xs mt-1" style={{ color: colors.textMuted }}>{descripcion}</p>
+          <p className="text-xs mt-2" style={{ color: colors.textMuted }}>{fecha}</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Executive Summary Component
+const ExecutiveSummary = ({ stats, documentos }: { stats: any; documentos: DocumentoPQRSD[] }) => {
+  const topSeries = Object.entries(stats.porSerie)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  const totalDocs = stats.total;

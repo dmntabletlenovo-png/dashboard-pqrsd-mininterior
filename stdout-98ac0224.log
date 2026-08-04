@@ -1,0 +1,938 @@
+import { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  FileText, AlertTriangle, Clock, TrendingUp, Filter, Download, 
+  Search, ChevronDown, Calendar, Users, Building2, BarChart3,
+  Activity, Bell, FileSpreadsheet, PieChart, Map, RefreshCw
+} from 'lucide-react';
+import data from '../data/pqrsd_data.json';
+import type { DocumentoPQRSD, Filtros } from '../types/pqrsd';
+
+// Color palette
+const colors = {
+  primary: '#1e3a5f',
+  secondary: '#2563eb',
+  accent: '#f59e0b',
+  danger: '#ef4444',
+  success: '#10b981',
+  warning: '#f97316',
+  bg: '#0f172a',
+  card: '#1e293b',
+  cardHover: '#334155',
+  text: '#f8fafc',
+  textMuted: '#94a3b8',
+  border: '#334155'
+};
+
+// KPI Card Component
+const KPICard = ({ 
+  title, 
+  value, 
+  icon: Icon, 
+  color, 
+  trend, 
+  subtitle 
+}: { 
+  title: string; 
+  value: string | number; 
+  icon: any; 
+  color: string; 
+  trend?: number; 
+  subtitle?: string;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="relative overflow-hidden rounded-xl p-6"
+    style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}
+  >
+    <div className="absolute top-0 right-0 w-32 h-32 opacity-10" 
+         style={{ background: `radial-gradient(circle, ${color} 0%, transparent 70%)` }} />
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-sm font-medium" style={{ color: colors.textMuted }}>{title}</p>
+        <p className="text-3xl font-bold mt-2" style={{ color }}>{value}</p>
+        {subtitle && <p className="text-xs mt-1" style={{ color: colors.textMuted }}>{subtitle}</p>}
+        {trend !== undefined && (
+          <div className="flex items-center mt-2">
+            <TrendingUp size={14} className={trend >= 0 ? 'text-green-500' : 'text-red-500'} />
+            <span className={`text-xs ml-1 ${trend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {trend >= 0 ? '+' : ''}{trend}%
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="p-3 rounded-lg" style={{ backgroundColor: `${color}20` }}>
+        <Icon size={24} style={{ color }} />
+      </div>
+    </div>
+  </motion.div>
+);
+
+// Bar Chart Component
+const BarChart = ({ 
+  data, 
+  maxValue, 
+  labelKey, 
+  valueKey, 
+  color = colors.secondary,
+  maxItems = 8
+}: { 
+  data: any[]; 
+  maxValue: number; 
+  labelKey: string; 
+  valueKey: string; 
+  color?: string;
+  maxItems?: number;
+}) => {
+  const displayData = data.slice(0, maxItems);
+  return (
+    <div className="space-y-3">
+      {displayData.map((item, index) => (
+        <div key={index} className="flex items-center gap-3">
+          <span className="text-xs w-32 truncate" style={{ color: colors.textMuted }}>
+            {item[labelKey]}
+          </span>
+          <div className="flex-1 h-6 rounded-full overflow-hidden" style={{ backgroundColor: `${color}20` }}>
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${(item[valueKey] / maxValue) * 100}%` }}
+              transition={{ duration: 0.8, delay: index * 0.05 }}
+              className="h-full rounded-full"
+              style={{ backgroundColor: color }}
+            />
+          </div>
+          <span className="text-sm font-semibold w-16 text-right" style={{ color: colors.text }}>
+            {item[valueKey].toLocaleString()}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Line Chart Component
+const LineChart = ({ data, color = colors.secondary }: { data: Record<string, number>; color?: string }) => {
+  const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+  const maxValue = Math.max(...entries.map(e => e[1]));
+  
+  return (
+    <div className="relative h-48">
+      <svg className="w-full h-full" viewBox="0 0 400 150" preserveAspectRatio="none">
+        {/* Grid lines */}
+        {[0, 1, 2, 3, 4].map(i => (
+          <line key={i} x1="0" y1={i * 37.5} x2="400" y2={i * 37.5} 
+                stroke={colors.border} strokeWidth="1" opacity="0.3" />
+        ))}
+        
+        {/* Line */}
+        <polyline
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          points={entries.map((e, i) => {
+            const x = (i / (entries.length - 1)) * 380 + 10;
+            const y = 150 - (e[1] / maxValue) * 140;
+            return `${x},${y}`;
+          }).join(' ')}
+        />
+        
+        {/* Area under line */}
+        <polygon
+          fill={`${color}30`}
+          points={`10,150 ${entries.map((e, i) => {
+            const x = (i / (entries.length - 1)) * 380 + 10;
+            const y = 150 - (e[1] / maxValue) * 140;
+            return `${x},${y}`;
+          }).join(' ')} ${390},150`}
+        />
+        
+        {/* Dots */}
+        {entries.map((e, i) => {
+          const x = (i / (entries.length - 1)) * 380 + 10;
+          const y = 150 - (e[1] / maxValue) * 140;
+          return (
+            <circle key={i} cx={x} cy={y} r="3" fill={color} />
+          );
+        })}
+      </svg>
+      
+      {/* Labels */}
+      <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2">
+        {entries.filter((_, i) => i % Math.ceil(entries.length / 6) === 0).map(([key], i) => (
+          <span key={i} className="text-xs" style={{ color: colors.textMuted }}>
+            {key.split('-')[1]}/{key.split('-')[0].slice(2)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Heat Map Component
+const HeatMap = ({ oficinas }: { oficinas: Record<string, number> }) => {
+  const entries = Object.entries(oficinas)
+    .filter(([key]) => key.length > 5)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+  const maxValue = Math.max(...entries.map(e => e[1]));
+  
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {entries.map(([oficina, count], index) => {
+        const intensity = count / maxValue;
+        const bg = `rgba(37, 99, 235, ${0.2 + intensity * 0.8})`;
+        const shortName = oficina.replace('DIRECCION DE ', '').replace('GRUPO DE ', '').substring(0, 25);
+        
+        return (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.03 }}
+            className="p-2 rounded-lg cursor-pointer hover:scale-105 transition-transform"
+            style={{ backgroundColor: bg }}
+            title={`${oficina}: ${count.toLocaleString()} documentos`}
+          >
+            <p className="text-xs font-medium truncate" style={{ color: colors.text }}>
+              {shortName}
+            </p>
+            <p className="text-lg font-bold" style={{ color: colors.text }}>
+              {count.toLocaleString()}
+            </p>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Alert Item Component
+const AlertItem = ({ 
+  titulo, 
+  descripcion, 
+  tipo, 
+  fecha 
+}: { 
+  titulo: string; 
+  descripcion: string; 
+  tipo: 'warning' | 'danger' | 'info'; 
+  fecha: string;
+}) => {
+  const bgColor = tipo === 'danger' ? '#7f1d1d' : tipo === 'warning' ? '#78350f' : '#1e3a5f';
+  const borderColor = tipo === 'danger' ? colors.danger : tipo === 'warning' ? colors.warning : colors.secondary;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="p-4 rounded-lg border-l-4"
+      style={{ backgroundColor: bgColor, borderLeftColor: borderColor }}
+    >
+      <div className="flex items-start gap-3">
+        <AlertTriangle size={18} style={{ color: borderColor }} className="mt-0.5" />
+        <div className="flex-1">
+          <p className="font-semibold text-sm" style={{ color: colors.text }}>{titulo}</p>
+          <p className="text-xs mt-1" style={{ color: colors.textMuted }}>{descripcion}</p>
+          <p className="text-xs mt-2" style={{ color: colors.textMuted }}>{fecha}</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Executive Summary Component
+const ExecutiveSummary = ({ stats, documentos }: { stats: any; documentos: DocumentoPQRSD[] }) => {
+  const topSeries = Object.entries(stats.porSerie)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  
+  const totalDocs = stats.total;
+  
+  return (
+    <div className="space-y-4">
+      <div className="p-4 rounded-lg" style={{ backgroundColor: `${colors.primary}40` }}>
+        <h4 className="font-semibold mb-2" style={{ color: colors.accent }}>Resumen Ejecutivo - Q3 2026</h4>
+        <p className="text-sm" style={{ color: colors.textMuted }}>
+          Se han registrado un total de <strong style={{ color: colors.text }}>{totalDocs.toLocaleString()}</strong> documentos 
+          en el sistema PQRSD. El {((stats.porSerie['DERECHOS DE PETICION'] || 0) / totalDocs * 100).toFixed(1)}% corresponden 
+          a Derechos de Petición, seguido por Comunicaciones Oficiales ({((stats.porSerie['COMUNICACIONES'] || 0) / totalDocs * 100).toFixed(1)}%).
+        </p>
+      </div>
+      
+      <div className="space-y-2">
+        <h5 className="font-semibold text-sm" style={{ color: colors.text }}>Top 5 Series Documentales:</h5>
+        {topSeries.map(([serie, count], index) => (
+          <div key={index} className="flex items-center justify-between p-2 rounded" 
+               style={{ backgroundColor: colors.card }}>
+            <span className="text-xs" style={{ color: colors.textMuted }}>{serie}</span>
+            <span className="text-sm font-bold" style={{ color: colors.secondary }}>
+              {((count as number) / totalDocs * 100).toFixed(1)}%
+            </span>
+          </div>
+        ))}
+      </div>
+      
+      <div className="p-3 rounded-lg" style={{ backgroundColor: `${colors.success}20` }}>
+        <p className="text-xs" style={{ color: colors.success }}>
+          ✓ Promedio de días de procesamiento: {stats.diasPromedio} días
+        </p>
+        <p className="text-xs mt-1" style={{ color: colors.success }}>
+          ✓ Documentos en rango crítico (+1000 días): {stats.porRangoDias['L.más de 1000 días']?.toLocaleString() || 0}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Export Function
+const exportToCSV = (documentos: DocumentoPQRSD[], filename: string) => {
+  const headers = ['ID', 'Radicado', 'Fecha Radicación', 'Serie', 'Subserie', 'Tipología', 'Clasificación', 'Asunto', 'Estado', 'Oficina', 'Gestor', 'Días', 'Rangos'];
+  const rows = documentos.map(doc => [
+    doc.id, doc.radicado, doc.fechaRadicacion, doc.serie, doc.subserie, 
+    doc.tipologia, doc.clasificacion, `"${doc.asunto.replace(/"/g, '""')}"`, 
+    doc.estado, doc.oficina, doc.gestor, doc.dias, doc.rangos
+  ]);
+  
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+};
+
+// Main Dashboard Component
+export default function Dashboard() {
+  const [filtros, setFiltros] = useState<Filtros>({
+    serie: '',
+    subserie: '',
+    oficina: '',
+    rangoDias: '',
+    busqueda: ''
+  });
+  
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'analysis' | 'alerts' | 'export'>('overview');
+  
+  // Apply filters
+  const documentosFiltrados = useMemo(() => {
+    return data.documentos.filter(doc => {
+      if (filtros.serie && !doc.serie.includes(filtros.serie)) return false;
+      if (filtros.subserie && !doc.subserie.includes(filtros.subserie)) return false;
+      if (filtros.oficina && !doc.oficina.includes(filtros.oficina)) return false;
+      if (filtros.rangoDias && doc.rangos !== filtros.rangoDias) return false;
+      if (filtros.busqueda) {
+        const searchLower = filtros.busqueda.toLowerCase();
+        if (!doc.asunto.toLowerCase().includes(searchLower) && 
+            !doc.radicado.toLowerCase().includes(searchLower) &&
+            !doc.firmante.toLowerCase().includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [filtros]);
+  
+  // Filtered stats
+  const statsFiltrados = useMemo(() => {
+    const stats = {
+      total: documentosFiltrados.length,
+      documentosVencidos: 0,
+      documentosPendientes: 0,
+      diasPromedio: 0,
+      porSerie: {} as Record<string, number>,
+      porSubserie: {} as Record<string, number>,
+      porOficina: {} as Record<string, number>,
+      porRangoDias: {} as Record<string, number>
+    };
+    
+    let totalDias = 0;
+    let countDias = 0;
+    
+    documentosFiltrados.forEach(doc => {
+      stats.porSerie[doc.serie] = (stats.porSerie[doc.serie] || 0) + 1;
+      stats.porSubserie[doc.subserie] = (stats.porSubserie[doc.subserie] || 0) + 1;
+      stats.porOficina[doc.oficina] = (stats.porOficina[doc.oficina] || 0) + 1;
+      stats.porRangoDias[doc.rangos] = (stats.porRangoDias[doc.rangos] || 0) + 1;
+      
+      if (doc.dias > 0) {
+        totalDias += doc.dias;
+        countDias++;
+      }
+      
+      if (doc.fechaVencimiento) {
+        const vencimiento = new Date(doc.fechaVencimiento);
+        if (vencimiento < new Date()) {
+          stats.documentosVencidos++;
+        } else {
+          stats.documentosPendientes++;
+        }
+      }
+    });
+    
+    stats.diasPromedio = countDias > 0 ? Math.round(totalDias / countDias) : 0;
+    
+    return stats;
+  }, [documentosFiltrados]);
+  
+  // Alerts based on data
+  const alertas = useMemo(() => {
+    const alerts = [];
+    
+    // Alert for documents over 1000 days
+    const docsOver1000 = documentosFiltrados.filter(d => d.dias > 1000).length;
+    if (docsOver1000 > 0) {
+      alerts.push({
+        titulo: 'Documentos con más de 1000 días de trámite',
+        descripcion: `Hay ${docsOver1000.toLocaleString()} documentos que llevan más de 1000 días sin resolver. Se requiere atención inmediata.`,
+        tipo: 'danger' as const,
+        fecha: 'Revisión continua'
+      });
+    }
+    
+    // Alert for high volume series
+    const topSeries = Object.entries(statsFiltrados.porSerie).sort((a, b) => b[1] - a[1])[0];
+    if (topSeries) {
+      alerts.push({
+        titulo: `Alta demanda en: ${topSeries[0]}`,
+        descripcion: `${topSeries[1].toLocaleString()} documentos en esta serie. Considerar asignar más recursos.`,
+        tipo: 'warning' as const,
+        fecha: 'Alerta automática'
+      });
+    }
+    
+    // Alert for pending documents
+    if (statsFiltrados.documentosPendientes > 1000) {
+      alerts.push({
+        titulo: 'Volumen alto de documentos pendientes',
+        descripcion: `${statsFiltrados.documentosPendientes.toLocaleString()} documentos con fecha de vencimiento por vencer.`,
+        tipo: 'warning' as const,
+        fecha: 'Monitoreo en tiempo real'
+      });
+    }
+    
+    return alerts;
+  }, [documentosFiltrados, statsFiltrados]);
+  
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: colors.bg }}>
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b" 
+              style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.secondary}20` }}>
+                <FileText size={24} style={{ color: colors.secondary }} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold" style={{ color: colors.text }}>
+                  Dashboard PQRSD
+                </h1>
+                <p className="text-xs" style={{ color: colors.textMuted }}>
+                  Ministerio del Interior - Asuntos Indígenas, ROM y Minorías
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" 
+                   style={{ backgroundColor: `${colors.success}20` }}>
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: colors.success }} />
+                <span className="text-xs font-medium" style={{ color: colors.success }}>En tiempo real</span>
+              </div>
+              
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                style={{ 
+                  backgroundColor: showFilters ? colors.secondary : 'transparent',
+                  color: showFilters ? 'white' : colors.textMuted,
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                <Filter size={16} />
+                <span className="text-sm">Filtros</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* Filters Panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-b"
+            style={{ backgroundColor: colors.card, borderColor: colors.border }}
+          >
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Serie Documental
+                  </label>
+                  <select
+                    value={filtros.serie}
+                    onChange={(e) => setFiltros({ ...filtros, serie: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porSerie).sort().map(serie => (
+                      <option key={serie} value={serie}>{serie}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Rango de Días
+                  </label>
+                  <select
+                    value={filtros.rangoDias}
+                    onChange={(e) => setFiltros({ ...filtros, rangoDias: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todos</option>
+                    {Object.keys(data.estadisticas.porRangoDias).filter(r => r).map(rango => (
+                      <option key={rango} value={rango}>{rango}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Oficina
+                  </label>
+                  <select
+                    value={filtros.oficina}
+                    onChange={(e) => setFiltros({ ...filtros, oficina: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porOficina).sort().map(oficina => (
+                      <option key={oficina} value={oficina}>{oficina}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Búsqueda
+                  </label>
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" 
+                            style={{ color: colors.textMuted }} />
+                    <input
+                      type="text"
+                      value={filtros.busqueda}
+                      onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
+                      placeholder="Buscar por asunto, radicado o firmante..."
+                      className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-xs" style={{ color: colors.textMuted }}>
+                  Mostrando {documentosFiltrados.length.toLocaleString()} de {data.estadisticas.total.toLocaleString()} documentos
+                </p>
+                <button
+                  onClick={() => setFiltros({ serie: '', subserie: '', oficina: '', rangoDias: '', busqueda: '' })}
+                  className="text-xs px-3 py-1 rounded"
+                  style={{ color: colors.secondary }}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <KPICard
+            title="Total Documentos"
+            value={statsFiltrados.total.toLocaleString()}
+            icon={FileText}
+            color={colors.secondary}
+            subtitle="Registros en el sistema"
+          />
+          <KPICard
+            title="Documentos Vencidos"
+            value={statsFiltrados.documentosVencidos.toLocaleString()}
+            icon={AlertTriangle}
+            color={colors.danger}
+            subtitle="Requieren atención urgente"
+          />
+          <KPICard
+            title="Pendientes"
+            value={statsFiltrados.documentosPendientes.toLocaleString()}
+            icon={Clock}
+            color={colors.warning}
+            subtitle="En proceso de trámite"
+          />
+          <KPICard
+            title="Promedio Días"
+            value={statsFiltrados.diasPromedio}
+            icon={Activity}
+            color={colors.success}
+            subtitle="Tiempo promedio de procesamiento"
+          />
+        </div>
+        
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto">
+          {[
+            { id: 'overview', label: 'Vista General', icon: BarChart3 },
+            { id: 'analysis', label: 'Análisis', icon: PieChart },
+            { id: 'alerts', label: `Alertas (${alertas.length})`, icon: Bell },
+            { id: 'export', label: 'Exportar', icon: Download }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors"
+              style={{
+                backgroundColor: activeTab === tab.id ? colors.secondary : colors.card,
+                color: activeTab === tab.id ? 'white' : colors.textMuted,
+                border: `1px solid ${activeTab === tab.id ? colors.secondary : colors.border}`
+              }}
+            >
+              <tab.icon size={16} />
+              <span className="text-sm">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+        
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'overview' && (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            >
+              {/* Distribution by Series */}
+              <div className="lg:col-span-2 p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <BarChart3 size={18} style={{ color: colors.secondary }} />
+                  Distribución por Serie Documental
+                </h3>
+                <BarChart
+                  data={Object.entries(statsFiltrados.porSerie)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([name, count]) => ({ name, count }))}
+                  maxValue={Math.max(...Object.values(statsFiltrados.porSerie))}
+                  labelKey="name"
+                  valueKey="count"
+                  color={colors.secondary}
+                />
+              </div>
+              
+              {/* Executive Summary */}
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <TrendingUp size={18} style={{ color: colors.accent }} />
+                  Resumen Ejecutivo
+                </h3>
+                <ExecutiveSummary stats={statsFiltrados} documentos={documentosFiltrados} />
+              </div>
+              
+              {/* Monthly Distribution */}
+              <div className="lg:col-span-2 p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Calendar size={18} style={{ color: colors.success }} />
+                  Distribución Mensual
+                </h3>
+                <LineChart data={data.distribucionMensual} color={colors.success} />
+              </div>
+              
+              {/* Heat Map */}
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Map size={18} style={{ color: colors.warning }} />
+                  Densidad por Oficina
+                </h3>
+                <HeatMap oficinas={statsFiltrados.porOficina} />
+              </div>
+            </motion.div>
+          )}
+          
+          {activeTab === 'analysis' && (
+            <motion.div
+              key="analysis"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+            >
+              {/* Top Gestores */}
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Users size={18} style={{ color: colors.secondary }} />
+                  Top Gestores
+                </h3>
+                <BarChart
+                  data={data.topGestores}
+                  maxValue={data.topGestores[0]?.count || 1}
+                  labelKey="name"
+                  valueKey="count"
+                  color={colors.secondary}
+                />
+              </div>
+              
+              {/* Distribution by Days */}
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Clock size={18} style={{ color: colors.warning }} />
+                  Distribución por Rango de Días
+                </h3>
+                <BarChart
+                  data={Object.entries(statsFiltrados.porRangoDias)
+                    .filter(([key]) => key)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([name, count]) => ({ name, count }))}
+                  maxValue={Math.max(...Object.values(statsFiltrados.porRangoDias))}
+                  labelKey="name"
+                  valueKey="count"
+                  color={colors.warning}
+                />
+              </div>
+              
+              {/* Subseries Distribution */}
+              <div className="lg:col-span-2 p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <PieChart size={18} style={{ color: colors.accent }} />
+                  Distribución por Subserie (Top 15)
+                </h3>
+                <BarChart
+                  data={Object.entries(statsFiltrados.porSubserie)
+                    .filter(([key]) => key)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 15)
+                    .map(([name, count]) => ({ name, count }))}
+                  maxValue={Math.max(...Object.values(statsFiltrados.porSubseries || {}))}
+                  labelKey="name"
+                  valueKey="count"
+                  color={colors.accent}
+                  maxItems={15}
+                />
+              </div>
+            </motion.div>
+          )}
+          
+          {activeTab === 'alerts' && (
+            <motion.div
+              key="alerts"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-4"
+            >
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Bell size={18} style={{ color: colors.danger }} />
+                  Alertas Automáticas
+                </h3>
+                <p className="text-sm mb-4" style={{ color: colors.textMuted }}>
+                  Sistema de monitoreo en tiempo real. Las alertas se generan automáticamente cuando se detectan condiciones críticas.
+                </p>
+                
+                <div className="space-y-3">
+                  {alertas.map((alerta, index) => (
+                    <AlertItem key={index} {...alerta} />
+                  ))}
+                  
+                  {alertas.length === 0 && (
+                    <div className="p-4 rounded-lg text-center" style={{ backgroundColor: `${colors.success}20` }}>
+                      <p className="text-sm" style={{ color: colors.success }}>
+                        ✓ No hay alertas activas en este momento
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Additional Alerts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl" style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                  <h4 className="font-semibold text-sm mb-2" style={{ color: colors.text }}>
+                    Documentos Críticos (+1000 días)
+                  </h4>
+                  <p className="text-2xl font-bold" style={{ color: colors.danger }}>
+                    {statsFiltrados.porRangoDias['L.más de 1000 días']?.toLocaleString() || 0}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: colors.textMuted }}>
+                    Documentos que requieren intervención urgente
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-xl" style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                  <h4 className="font-semibold text-sm mb-2" style={{ color: colors.text }}>
+                    Tasa de Resolución
+                  </h4>
+                  <p className="text-2xl font-bold" style={{ color: colors.success }}>
+                    {((statsFiltrados.documentosPendientes / (statsFiltrados.total || 1)) * 100).toFixed(1)}%
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: colors.textMuted }}>
+                    Documentos con plazo vigente
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+          
+          {activeTab === 'export' && (
+            <motion.div
+              key="export"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            >
+              {/* Export Options */}
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Download size={18} style={{ color: colors.secondary }} />
+                  Exportar Reportes
+                </h3>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => exportToCSV(documentosFiltrados, 'PQRSD_Completo')}
+                    className="w-full p-4 rounded-lg flex items-center gap-3 transition-colors hover:opacity-90"
+                    style={{ backgroundColor: colors.secondary, color: 'white' }}
+                  >
+                    <FileSpreadsheet size={20} />
+                    <div className="text-left">
+                      <p className="font-medium">Exportar CSV Completo</p>
+                      <p className="text-xs opacity-80">
+                        {documentosFiltrados.length.toLocaleString()} documentos filtrados
+                      </p>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => exportToCSV(
+                      documentosFiltrados.filter(d => d.dias > 1000), 
+                      'PQRSD_Criticos'
+                    )}
+                    className="w-full p-4 rounded-lg flex items-center gap-3 transition-colors hover:opacity-90"
+                    style={{ backgroundColor: colors.danger, color: 'white' }}
+                  >
+                    <AlertTriangle size={20} />
+                    <div className="text-left">
+                      <p className="font-medium">Exportar Documentos Críticos</p>
+                      <p className="text-xs opacity-80">
+                        Documentos con +1000 días de trámite
+                      </p>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => exportToCSV(
+                      documentosFiltrados.filter(d => d.fechaVencimiento && new Date(d.fechaVencimiento) < new Date()), 
+                      'PQRSD_Vencidos'
+                    )}
+                    className="w-full p-4 rounded-lg flex items-center gap-3 transition-colors hover:opacity-90"
+                    style={{ backgroundColor: colors.warning, color: 'white' }}
+                  >
+                    <Clock size={20} />
+                    <div className="text-left">
+                      <p className="font-medium">Exportar Vencidos</p>
+                      <p className="text-xs opacity-80">
+                        Documentos con fecha de vencimiento pasada
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Summary for Presentation */}
+              <div className="p-6 rounded-xl" 
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Building2 size={18} style={{ color: colors.accent }} />
+                  Resumen para Presentación
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+                    <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Total de Documentos</p>
+                    <p className="text-xl font-bold" style={{ color: colors.text }}>
+                      {statsFiltrados.total.toLocaleString()}
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+                      <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Vencidos</p>
+                      <p className="text-lg font-bold" style={{ color: colors.danger }}>
+                        {statsFiltrados.documentosVencidos.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+                      <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Pendientes</p>
+                      <p className="text-lg font-bold" style={{ color: colors.warning }}>
+                        {statsFiltrados.documentosPendientes.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+                    <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Promedio de Días</p>
+                    <p className="text-lg font-bold" style={{ color: colors.success }}>
+                      {statsFiltrados.diasPromedio} días
+                    </p>
+                  </div>
+                  
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${colors.accent}20` }}>
+                    <p className="text-xs font-medium" style={{ color: colors.accent }}>
+                      Generado: {new Date().toLocaleDateString('es-CO')} - {new Date().toLocaleTimeString('es-CO')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+      
+      {/* Footer */}
+      <footer className="border-t mt-8 py-4" style={{ borderColor: colors.border }}>
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
+          <p className="text-xs" style={{ color: colors.textMuted }}>
+            Dashboard PQRSD v1.0 - Ministerio del Interior
+          </p>
+          <p className="text-xs" style={{ color: colors.textMuted }}>
+            Actualizado: {new Date().toLocaleString('es-CO')}
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}

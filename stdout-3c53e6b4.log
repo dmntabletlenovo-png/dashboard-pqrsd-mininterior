@@ -1,0 +1,938 @@
+     1	import { useState, useMemo, useEffect } from 'react';
+     2	import { motion, AnimatePresence } from 'framer-motion';
+     3	import { 
+     4	  FileText, AlertTriangle, Clock, TrendingUp, Filter, Download, 
+     5	  Search, ChevronDown, Calendar, Users, Building2, BarChart3,
+     6	  Activity, Bell, FileSpreadsheet, PieChart, Map, RefreshCw
+     7	} from 'lucide-react';
+     8	import data from '../data/pqrsd_data.json';
+     9	import type { DocumentoPQRSD, Filtros } from '../types/pqrsd';
+    10	
+    11	// Color palette
+    12	const colors = {
+    13	  primary: '#1e3a5f',
+    14	  secondary: '#2563eb',
+    15	  accent: '#f59e0b',
+    16	  danger: '#ef4444',
+    17	  success: '#10b981',
+    18	  warning: '#f97316',
+    19	  bg: '#0f172a',
+    20	  card: '#1e293b',
+    21	  cardHover: '#334155',
+    22	  text: '#f8fafc',
+    23	  textMuted: '#94a3b8',
+    24	  border: '#334155'
+    25	};
+    26	
+    27	// KPI Card Component
+    28	const KPICard = ({ 
+    29	  title, 
+    30	  value, 
+    31	  icon: Icon, 
+    32	  color, 
+    33	  trend, 
+    34	  subtitle 
+    35	}: { 
+    36	  title: string; 
+    37	  value: string | number; 
+    38	  icon: any; 
+    39	  color: string; 
+    40	  trend?: number; 
+    41	  subtitle?: string;
+    42	}) => (
+    43	  <motion.div
+    44	    initial={{ opacity: 0, y: 20 }}
+    45	    animate={{ opacity: 1, y: 0 }}
+    46	    className="relative overflow-hidden rounded-xl p-6"
+    47	    style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}
+    48	  >
+    49	    <div className="absolute top-0 right-0 w-32 h-32 opacity-10" 
+    50	         style={{ background: `radial-gradient(circle, ${color} 0%, transparent 70%)` }} />
+    51	    <div className="flex items-start justify-between">
+    52	      <div>
+    53	        <p className="text-sm font-medium" style={{ color: colors.textMuted }}>{title}</p>
+    54	        <p className="text-3xl font-bold mt-2" style={{ color }}>{value}</p>
+    55	        {subtitle && <p className="text-xs mt-1" style={{ color: colors.textMuted }}>{subtitle}</p>}
+    56	        {trend !== undefined && (
+    57	          <div className="flex items-center mt-2">
+    58	            <TrendingUp size={14} className={trend >= 0 ? 'text-green-500' : 'text-red-500'} />
+    59	            <span className={`text-xs ml-1 ${trend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+    60	              {trend >= 0 ? '+' : ''}{trend}%
+    61	            </span>
+    62	          </div>
+    63	        )}
+    64	      </div>
+    65	      <div className="p-3 rounded-lg" style={{ backgroundColor: `${color}20` }}>
+    66	        <Icon size={24} style={{ color }} />
+    67	      </div>
+    68	    </div>
+    69	  </motion.div>
+    70	);
+    71	
+    72	// Bar Chart Component
+    73	const BarChart = ({ 
+    74	  data, 
+    75	  maxValue, 
+    76	  labelKey, 
+    77	  valueKey, 
+    78	  color = colors.secondary,
+    79	  maxItems = 8
+    80	}: { 
+    81	  data: any[]; 
+    82	  maxValue: number; 
+    83	  labelKey: string; 
+    84	  valueKey: string; 
+    85	  color?: string;
+    86	  maxItems?: number;
+    87	}) => {
+    88	  const displayData = data.slice(0, maxItems);
+    89	  return (
+    90	    <div className="space-y-3">
+    91	      {displayData.map((item, index) => (
+    92	        <div key={index} className="flex items-center gap-3">
+    93	          <span className="text-xs w-32 truncate" style={{ color: colors.textMuted }}>
+    94	            {item[labelKey]}
+    95	          </span>
+    96	          <div className="flex-1 h-6 rounded-full overflow-hidden" style={{ backgroundColor: `${color}20` }}>
+    97	            <motion.div
+    98	              initial={{ width: 0 }}
+    99	              animate={{ width: `${(item[valueKey] / maxValue) * 100}%` }}
+   100	              transition={{ duration: 0.8, delay: index * 0.05 }}
+   101	              className="h-full rounded-full"
+   102	              style={{ backgroundColor: color }}
+   103	            />
+   104	          </div>
+   105	          <span className="text-sm font-semibold w-16 text-right" style={{ color: colors.text }}>
+   106	            {item[valueKey].toLocaleString()}
+   107	          </span>
+   108	        </div>
+   109	      ))}
+   110	    </div>
+   111	  );
+   112	};
+   113	
+   114	// Line Chart Component
+   115	const LineChart = ({ data, color = colors.secondary }: { data: Record<string, number>; color?: string }) => {
+   116	  const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+   117	  const maxValue = Math.max(...entries.map(e => e[1]));
+   118	  
+   119	  return (
+   120	    <div className="relative h-48">
+   121	      <svg className="w-full h-full" viewBox="0 0 400 150" preserveAspectRatio="none">
+   122	        {/* Grid lines */}
+   123	        {[0, 1, 2, 3, 4].map(i => (
+   124	          <line key={i} x1="0" y1={i * 37.5} x2="400" y2={i * 37.5} 
+   125	                stroke={colors.border} strokeWidth="1" opacity="0.3" />
+   126	        ))}
+   127	        
+   128	        {/* Line */}
+   129	        <polyline
+   130	          fill="none"
+   131	          stroke={color}
+   132	          strokeWidth="2"
+   133	          points={entries.map((e, i) => {
+   134	            const x = (i / (entries.length - 1)) * 380 + 10;
+   135	            const y = 150 - (e[1] / maxValue) * 140;
+   136	            return `${x},${y}`;
+   137	          }).join(' ')}
+   138	        />
+   139	        
+   140	        {/* Area under line */}
+   141	        <polygon
+   142	          fill={`${color}30`}
+   143	          points={`10,150 ${entries.map((e, i) => {
+   144	            const x = (i / (entries.length - 1)) * 380 + 10;
+   145	            const y = 150 - (e[1] / maxValue) * 140;
+   146	            return `${x},${y}`;
+   147	          }).join(' ')} ${390},150`}
+   148	        />
+   149	        
+   150	        {/* Dots */}
+   151	        {entries.map((e, i) => {
+   152	          const x = (i / (entries.length - 1)) * 380 + 10;
+   153	          const y = 150 - (e[1] / maxValue) * 140;
+   154	          return (
+   155	            <circle key={i} cx={x} cy={y} r="3" fill={color} />
+   156	          );
+   157	        })}
+   158	      </svg>
+   159	      
+   160	      {/* Labels */}
+   161	      <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2">
+   162	        {entries.filter((_, i) => i % Math.ceil(entries.length / 6) === 0).map(([key], i) => (
+   163	          <span key={i} className="text-xs" style={{ color: colors.textMuted }}>
+   164	            {key.split('-')[1]}/{key.split('-')[0].slice(2)}
+   165	          </span>
+   166	        ))}
+   167	      </div>
+   168	    </div>
+   169	  );
+   170	};
+   171	
+   172	// Heat Map Component
+   173	const HeatMap = ({ oficinas }: { oficinas: Record<string, number> }) => {
+   174	  const entries = Object.entries(oficinas)
+   175	    .filter(([key]) => key.length > 5)
+   176	    .sort((a, b) => b[1] - a[1])
+   177	    .slice(0, 20);
+   178	  const maxValue = Math.max(...entries.map(e => e[1]));
+   179	  
+   180	  return (
+   181	    <div className="grid grid-cols-4 gap-2">
+   182	      {entries.map(([oficina, count], index) => {
+   183	        const intensity = count / maxValue;
+   184	        const bg = `rgba(37, 99, 235, ${0.2 + intensity * 0.8})`;
+   185	        const shortName = oficina.replace('DIRECCION DE ', '').replace('GRUPO DE ', '').substring(0, 25);
+   186	        
+   187	        return (
+   188	          <motion.div
+   189	            key={index}
+   190	            initial={{ opacity: 0, scale: 0.8 }}
+   191	            animate={{ opacity: 1, scale: 1 }}
+   192	            transition={{ delay: index * 0.03 }}
+   193	            className="p-2 rounded-lg cursor-pointer hover:scale-105 transition-transform"
+   194	            style={{ backgroundColor: bg }}
+   195	            title={`${oficina}: ${count.toLocaleString()} documentos`}
+   196	          >
+   197	            <p className="text-xs font-medium truncate" style={{ color: colors.text }}>
+   198	              {shortName}
+   199	            </p>
+   200	            <p className="text-lg font-bold" style={{ color: colors.text }}>
+   201	              {count.toLocaleString()}
+   202	            </p>
+   203	          </motion.div>
+   204	        );
+   205	      })}
+   206	    </div>
+   207	  );
+   208	};
+   209	
+   210	// Alert Item Component
+   211	const AlertItem = ({ 
+   212	  titulo, 
+   213	  descripcion, 
+   214	  tipo, 
+   215	  fecha 
+   216	}: { 
+   217	  titulo: string; 
+   218	  descripcion: string; 
+   219	  tipo: 'warning' | 'danger' | 'info'; 
+   220	  fecha: string;
+   221	}) => {
+   222	  const bgColor = tipo === 'danger' ? '#7f1d1d' : tipo === 'warning' ? '#78350f' : '#1e3a5f';
+   223	  const borderColor = tipo === 'danger' ? colors.danger : tipo === 'warning' ? colors.warning : colors.secondary;
+   224	  
+   225	  return (
+   226	    <motion.div
+   227	      initial={{ opacity: 0, x: -20 }}
+   228	      animate={{ opacity: 1, x: 0 }}
+   229	      className="p-4 rounded-lg border-l-4"
+   230	      style={{ backgroundColor: bgColor, borderLeftColor: borderColor }}
+   231	    >
+   232	      <div className="flex items-start gap-3">
+   233	        <AlertTriangle size={18} style={{ color: borderColor }} className="mt-0.5" />
+   234	        <div className="flex-1">
+   235	          <p className="font-semibold text-sm" style={{ color: colors.text }}>{titulo}</p>
+   236	          <p className="text-xs mt-1" style={{ color: colors.textMuted }}>{descripcion}</p>
+   237	          <p className="text-xs mt-2" style={{ color: colors.textMuted }}>{fecha}</p>
+   238	        </div>
+   239	      </div>
+   240	    </motion.div>
+   241	  );
+   242	};
+   243	
+   244	// Executive Summary Component
+   245	const ExecutiveSummary = ({ stats, documentos }: { stats: any; documentos: DocumentoPQRSD[] }) => {
+   246	  const topSeries = Object.entries(stats.porSerie)
+   247	    .sort((a, b) => b[1] - a[1])
+   248	    .slice(0, 5);
+   249	  
+   250	  const totalDocs = stats.total;
+   251	  
+   252	  return (
+   253	    <div className="space-y-4">
+   254	      <div className="p-4 rounded-lg" style={{ backgroundColor: `${colors.primary}40` }}>
+   255	        <h4 className="font-semibold mb-2" style={{ color: colors.accent }}>Resumen Ejecutivo - Q3 2026</h4>
+   256	        <p className="text-sm" style={{ color: colors.textMuted }}>
+   257	          Se han registrado un total de <strong style={{ color: colors.text }}>{totalDocs.toLocaleString()}</strong> documentos 
+   258	          en el sistema PQRSD. El {((stats.porSerie['DERECHOS DE PETICION'] || 0) / totalDocs * 100).toFixed(1)}% corresponden 
+   259	          a Derechos de Petición, seguido por Comunicaciones Oficiales ({((stats.porSerie['COMUNICACIONES'] || 0) / totalDocs * 100).toFixed(1)}%).
+   260	        </p>
+   261	      </div>
+   262	      
+   263	      <div className="space-y-2">
+   264	        <h5 className="font-semibold text-sm" style={{ color: colors.text }}>Top 5 Series Documentales:</h5>
+   265	        {topSeries.map(([serie, count], index) => (
+   266	          <div key={index} className="flex items-center justify-between p-2 rounded" 
+   267	               style={{ backgroundColor: colors.card }}>
+   268	            <span className="text-xs" style={{ color: colors.textMuted }}>{serie}</span>
+   269	            <span className="text-sm font-bold" style={{ color: colors.secondary }}>
+   270	              {((count as number) / totalDocs * 100).toFixed(1)}%
+   271	            </span>
+   272	          </div>
+   273	        ))}
+   274	      </div>
+   275	      
+   276	      <div className="p-3 rounded-lg" style={{ backgroundColor: `${colors.success}20` }}>
+   277	        <p className="text-xs" style={{ color: colors.success }}>
+   278	          ✓ Promedio de días de procesamiento: {stats.diasPromedio} días
+   279	        </p>
+   280	        <p className="text-xs mt-1" style={{ color: colors.success }}>
+   281	          ✓ Documentos en rango crítico (+1000 días): {stats.porRangoDias['L.más de 1000 días']?.toLocaleString() || 0}
+   282	        </p>
+   283	      </div>
+   284	    </div>
+   285	  );
+   286	};
+   287	
+   288	// Export Function
+   289	const exportToCSV = (documentos: DocumentoPQRSD[], filename: string) => {
+   290	  const headers = ['ID', 'Radicado', 'Fecha Radicación', 'Serie', 'Subserie', 'Tipología', 'Clasificación', 'Asunto', 'Estado', 'Oficina', 'Gestor', 'Días', 'Rangos'];
+   291	  const rows = documentos.map(doc => [
+   292	    doc.id, doc.radicado, doc.fechaRadicacion, doc.serie, doc.subserie, 
+   293	    doc.tipologia, doc.clasificacion, `"${doc.asunto.replace(/"/g, '""')}"`, 
+   294	    doc.estado, doc.oficina, doc.gestor, doc.dias, doc.rangos
+   295	  ]);
+   296	  
+   297	  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+   298	  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+   299	  const link = document.createElement('a');
+   300	  link.href = URL.createObjectURL(blob);
+   301	  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+   302	  link.click();
+   303	};
+   304	
+   305	// Main Dashboard Component
+   306	export default function Dashboard() {
+   307	  const [filtros, setFiltros] = useState<Filtros>({
+   308	    serie: '',
+   309	    subserie: '',
+   310	    oficina: '',
+   311	    rangoDias: '',
+   312	    busqueda: ''
+   313	  });
+   314	  
+   315	  const [showFilters, setShowFilters] = useState(false);
+   316	  const [activeTab, setActiveTab] = useState<'overview' | 'analysis' | 'alerts' | 'export'>('overview');
+   317	  
+   318	  // Apply filters
+   319	  const documentosFiltrados = useMemo(() => {
+   320	    return data.documentos.filter(doc => {
+   321	      if (filtros.serie && !doc.serie.includes(filtros.serie)) return false;
+   322	      if (filtros.subserie && !doc.subserie.includes(filtros.subserie)) return false;
+   323	      if (filtros.oficina && !doc.oficina.includes(filtros.oficina)) return false;
+   324	      if (filtros.rangoDias && doc.rangos !== filtros.rangoDias) return false;
+   325	      if (filtros.busqueda) {
+   326	        const searchLower = filtros.busqueda.toLowerCase();
+   327	        if (!doc.asunto.toLowerCase().includes(searchLower) && 
+   328	            !doc.radicado.toLowerCase().includes(searchLower) &&
+   329	            !doc.firmante.toLowerCase().includes(searchLower)) {
+   330	          return false;
+   331	        }
+   332	      }
+   333	      return true;
+   334	    });
+   335	  }, [filtros]);
+   336	  
+   337	  // Filtered stats
+   338	  const statsFiltrados = useMemo(() => {
+   339	    const stats = {
+   340	      total: documentosFiltrados.length,
+   341	      documentosVencidos: 0,
+   342	      documentosPendientes: 0,
+   343	      diasPromedio: 0,
+   344	      porSerie: {} as Record<string, number>,
+   345	      porSubserie: {} as Record<string, number>,
+   346	      porOficina: {} as Record<string, number>,
+   347	      porRangoDias: {} as Record<string, number>
+   348	    };
+   349	    
+   350	    let totalDias = 0;
+   351	    let countDias = 0;
+   352	    
+   353	    documentosFiltrados.forEach(doc => {
+   354	      stats.porSerie[doc.serie] = (stats.porSerie[doc.serie] || 0) + 1;
+   355	      stats.porSubserie[doc.subserie] = (stats.porSubserie[doc.subserie] || 0) + 1;
+   356	      stats.porOficina[doc.oficina] = (stats.porOficina[doc.oficina] || 0) + 1;
+   357	      stats.porRangoDias[doc.rangos] = (stats.porRangoDias[doc.rangos] || 0) + 1;
+   358	      
+   359	      if (doc.dias > 0) {
+   360	        totalDias += doc.dias;
+   361	        countDias++;
+   362	      }
+   363	      
+   364	      if (doc.fechaVencimiento) {
+   365	        const vencimiento = new Date(doc.fechaVencimiento);
+   366	        if (vencimiento < new Date()) {
+   367	          stats.documentosVencidos++;
+   368	        } else {
+   369	          stats.documentosPendientes++;
+   370	        }
+   371	      }
+   372	    });
+   373	    
+   374	    stats.diasPromedio = countDias > 0 ? Math.round(totalDias / countDias) : 0;
+   375	    
+   376	    return stats;
+   377	  }, [documentosFiltrados]);
+   378	  
+   379	  // Alerts based on data
+   380	  const alertas = useMemo(() => {
+   381	    const alerts = [];
+   382	    
+   383	    // Alert for documents over 1000 days
+   384	    const docsOver1000 = documentosFiltrados.filter(d => d.dias > 1000).length;
+   385	    if (docsOver1000 > 0) {
+   386	      alerts.push({
+   387	        titulo: 'Documentos con más de 1000 días de trámite',
+   388	        descripcion: `Hay ${docsOver1000.toLocaleString()} documentos que llevan más de 1000 días sin resolver. Se requiere atención inmediata.`,
+   389	        tipo: 'danger' as const,
+   390	        fecha: 'Revisión continua'
+   391	      });
+   392	    }
+   393	    
+   394	    // Alert for high volume series
+   395	    const topSeries = Object.entries(statsFiltrados.porSerie).sort((a, b) => b[1] - a[1])[0];
+   396	    if (topSeries) {
+   397	      alerts.push({
+   398	        titulo: `Alta demanda en: ${topSeries[0]}`,
+   399	        descripcion: `${topSeries[1].toLocaleString()} documentos en esta serie. Considerar asignar más recursos.`,
+   400	        tipo: 'warning' as const,
+   401	        fecha: 'Alerta automática'
+   402	      });
+   403	    }
+   404	    
+   405	    // Alert for pending documents
+   406	    if (statsFiltrados.documentosPendientes > 1000) {
+   407	      alerts.push({
+   408	        titulo: 'Volumen alto de documentos pendientes',
+   409	        descripcion: `${statsFiltrados.documentosPendientes.toLocaleString()} documentos con fecha de vencimiento por vencer.`,
+   410	        tipo: 'warning' as const,
+   411	        fecha: 'Monitoreo en tiempo real'
+   412	      });
+   413	    }
+   414	    
+   415	    return alerts;
+   416	  }, [documentosFiltrados, statsFiltrados]);
+   417	  
+   418	  return (
+   419	    <div className="min-h-screen" style={{ backgroundColor: colors.bg }}>
+   420	      {/* Header */}
+   421	      <header className="sticky top-0 z-50 border-b" 
+   422	              style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+   423	        <div className="max-w-7xl mx-auto px-4 py-4">
+   424	          <div className="flex items-center justify-between">
+   425	            <div className="flex items-center gap-3">
+   426	              <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.secondary}20` }}>
+   427	                <FileText size={24} style={{ color: colors.secondary }} />
+   428	              </div>
+   429	              <div>
+   430	                <h1 className="text-xl font-bold" style={{ color: colors.text }}>
+   431	                  Dashboard PQRSD
+   432	                </h1>
+   433	                <p className="text-xs" style={{ color: colors.textMuted }}>
+   434	                  Ministerio del Interior - Asuntos Indígenas, ROM y Minorías
+   435	                </p>
+   436	              </div>
+   437	            </div>
+   438	            
+   439	            <div className="flex items-center gap-4">
+   440	              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" 
+   441	                   style={{ backgroundColor: `${colors.success}20` }}>
+   442	                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: colors.success }} />
+   443	                <span className="text-xs font-medium" style={{ color: colors.success }}>En tiempo real</span>
+   444	              </div>
+   445	              
+   446	              <button 
+   447	                onClick={() => setShowFilters(!showFilters)}
+   448	                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+   449	                style={{ 
+   450	                  backgroundColor: showFilters ? colors.secondary : 'transparent',
+   451	                  color: showFilters ? 'white' : colors.textMuted,
+   452	                  border: `1px solid ${colors.border}`
+   453	                }}
+   454	              >
+   455	                <Filter size={16} />
+   456	                <span className="text-sm">Filtros</span>
+   457	              </button>
+   458	            </div>
+   459	          </div>
+   460	        </div>
+   461	      </header>
+   462	      
+   463	      {/* Filters Panel */}
+   464	      <AnimatePresence>
+   465	        {showFilters && (
+   466	          <motion.div
+   467	            initial={{ height: 0, opacity: 0 }}
+   468	            animate={{ height: 'auto', opacity: 1 }}
+   469	            exit={{ height: 0, opacity: 0 }}
+   470	            className="overflow-hidden border-b"
+   471	            style={{ backgroundColor: colors.card, borderColor: colors.border }}
+   472	          >
+   473	            <div className="max-w-7xl mx-auto px-4 py-4">
+   474	              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+   475	                <div>
+   476	                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+   477	                    Serie Documental
+   478	                  </label>
+   479	                  <select
+   480	                    value={filtros.serie}
+   481	                    onChange={(e) => setFiltros({ ...filtros, serie: e.target.value })}
+   482	                    className="w-full px-3 py-2 rounded-lg text-sm"
+   483	                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+   484	                  >
+   485	                    <option value="">Todas</option>
+   486	                    {Object.keys(data.estadisticas.porSerie).sort().map(serie => (
+   487	                      <option key={serie} value={serie}>{serie}</option>
+   488	                    ))}
+   489	                  </select>
+   490	                </div>
+   491	                
+   492	                <div>
+   493	                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+   494	                    Rango de Días
+   495	                  </label>
+   496	                  <select
+   497	                    value={filtros.rangoDias}
+   498	                    onChange={(e) => setFiltros({ ...filtros, rangoDias: e.target.value })}
+   499	                    className="w-full px-3 py-2 rounded-lg text-sm"
+   500	                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+   501	                  >
+   502	                    <option value="">Todos</option>
+   503	                    {Object.keys(data.estadisticas.porRangoDias).filter(r => r).map(rango => (
+   504	                      <option key={rango} value={rango}>{rango}</option>
+   505	                    ))}
+   506	                  </select>
+   507	                </div>
+   508	                
+   509	                <div>
+   510	                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+   511	                    Oficina
+   512	                  </label>
+   513	                  <select
+   514	                    value={filtros.oficina}
+   515	                    onChange={(e) => setFiltros({ ...filtros, oficina: e.target.value })}
+   516	                    className="w-full px-3 py-2 rounded-lg text-sm"
+   517	                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+   518	                  >
+   519	                    <option value="">Todas</option>
+   520	                    {Object.keys(data.estadisticas.porOficina).sort().map(oficina => (
+   521	                      <option key={oficina} value={oficina}>{oficina}</option>
+   522	                    ))}
+   523	                  </select>
+   524	                </div>
+   525	                
+   526	                <div className="md:col-span-2">
+   527	                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+   528	                    Búsqueda
+   529	                  </label>
+   530	                  <div className="relative">
+   531	                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" 
+   532	                            style={{ color: colors.textMuted }} />
+   533	                    <input
+   534	                      type="text"
+   535	                      value={filtros.busqueda}
+   536	                      onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
+   537	                      placeholder="Buscar por asunto, radicado o firmante..."
+   538	                      className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+   539	                      style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+   540	                    />
+   541	                  </div>
+   542	                </div>
+   543	              </div>
+   544	              
+   545	              <div className="flex items-center justify-between mt-4">
+   546	                <p className="text-xs" style={{ color: colors.textMuted }}>
+   547	                  Mostrando {documentosFiltrados.length.toLocaleString()} de {data.estadisticas.total.toLocaleString()} documentos
+   548	                </p>
+   549	                <button
+   550	                  onClick={() => setFiltros({ serie: '', subserie: '', oficina: '', rangoDias: '', busqueda: '' })}
+   551	                  className="text-xs px-3 py-1 rounded"
+   552	                  style={{ color: colors.secondary }}
+   553	                >
+   554	                  Limpiar filtros
+   555	                </button>
+   556	              </div>
+   557	            </div>
+   558	          </motion.div>
+   559	        )}
+   560	      </AnimatePresence>
+   561	      
+   562	      {/* Main Content */}
+   563	      <main className="max-w-7xl mx-auto px-4 py-6">
+   564	        {/* KPI Cards */}
+   565	        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+   566	          <KPICard
+   567	            title="Total Documentos"
+   568	            value={statsFiltrados.total.toLocaleString()}
+   569	            icon={FileText}
+   570	            color={colors.secondary}
+   571	            subtitle="Registros en el sistema"
+   572	          />
+   573	          <KPICard
+   574	            title="Documentos Vencidos"
+   575	            value={statsFiltrados.documentosVencidos.toLocaleString()}
+   576	            icon={AlertTriangle}
+   577	            color={colors.danger}
+   578	            subtitle="Requieren atención urgente"
+   579	          />
+   580	          <KPICard
+   581	            title="Pendientes"
+   582	            value={statsFiltrados.documentosPendientes.toLocaleString()}
+   583	            icon={Clock}
+   584	            color={colors.warning}
+   585	            subtitle="En proceso de trámite"
+   586	          />
+   587	          <KPICard
+   588	            title="Promedio Días"
+   589	            value={statsFiltrados.diasPromedio}
+   590	            icon={Activity}
+   591	            color={colors.success}
+   592	            subtitle="Tiempo promedio de procesamiento"
+   593	          />
+   594	        </div>
+   595	        
+   596	        {/* Tabs */}
+   597	        <div className="flex gap-2 mb-6 overflow-x-auto">
+   598	          {[
+   599	            { id: 'overview', label: 'Vista General', icon: BarChart3 },
+   600	            { id: 'analysis', label: 'Análisis', icon: PieChart },
+   601	            { id: 'alerts', label: `Alertas (${alertas.length})`, icon: Bell },
+   602	            { id: 'export', label: 'Exportar', icon: Download }
+   603	          ].map(tab => (
+   604	            <button
+   605	              key={tab.id}
+   606	              onClick={() => setActiveTab(tab.id as any)}
+   607	              className="flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors"
+   608	              style={{
+   609	                backgroundColor: activeTab === tab.id ? colors.secondary : colors.card,
+   610	                color: activeTab === tab.id ? 'white' : colors.textMuted,
+   611	                border: `1px solid ${activeTab === tab.id ? colors.secondary : colors.border}`
+   612	              }}
+   613	            >
+   614	              <tab.icon size={16} />
+   615	              <span className="text-sm">{tab.label}</span>
+   616	            </button>
+   617	          ))}
+   618	        </div>
+   619	        
+   620	        {/* Tab Content */}
+   621	        <AnimatePresence mode="wait">
+   622	          {activeTab === 'overview' && (
+   623	            <motion.div
+   624	              key="overview"
+   625	              initial={{ opacity: 0 }}
+   626	              animate={{ opacity: 1 }}
+   627	              exit={{ opacity: 0 }}
+   628	              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+   629	            >
+   630	              {/* Distribution by Series */}
+   631	              <div className="lg:col-span-2 p-6 rounded-xl" 
+   632	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   633	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   634	                  <BarChart3 size={18} style={{ color: colors.secondary }} />
+   635	                  Distribución por Serie Documental
+   636	                </h3>
+   637	                <BarChart
+   638	                  data={Object.entries(statsFiltrados.porSerie)
+   639	                    .sort((a, b) => b[1] - a[1])
+   640	                    .map(([name, count]) => ({ name, count }))}
+   641	                  maxValue={Math.max(...Object.values(statsFiltrados.porSerie))}
+   642	                  labelKey="name"
+   643	                  valueKey="count"
+   644	                  color={colors.secondary}
+   645	                />
+   646	              </div>
+   647	              
+   648	              {/* Executive Summary */}
+   649	              <div className="p-6 rounded-xl" 
+   650	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   651	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   652	                  <TrendingUp size={18} style={{ color: colors.accent }} />
+   653	                  Resumen Ejecutivo
+   654	                </h3>
+   655	                <ExecutiveSummary stats={statsFiltrados} documentos={documentosFiltrados} />
+   656	              </div>
+   657	              
+   658	              {/* Monthly Distribution */}
+   659	              <div className="lg:col-span-2 p-6 rounded-xl" 
+   660	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   661	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   662	                  <Calendar size={18} style={{ color: colors.success }} />
+   663	                  Distribución Mensual
+   664	                </h3>
+   665	                <LineChart data={data.distribucionMensual} color={colors.success} />
+   666	              </div>
+   667	              
+   668	              {/* Heat Map */}
+   669	              <div className="p-6 rounded-xl" 
+   670	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   671	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   672	                  <Map size={18} style={{ color: colors.warning }} />
+   673	                  Densidad por Oficina
+   674	                </h3>
+   675	                <HeatMap oficinas={statsFiltrados.porOficina} />
+   676	              </div>
+   677	            </motion.div>
+   678	          )}
+   679	          
+   680	          {activeTab === 'analysis' && (
+   681	            <motion.div
+   682	              key="analysis"
+   683	              initial={{ opacity: 0 }}
+   684	              animate={{ opacity: 1 }}
+   685	              exit={{ opacity: 0 }}
+   686	              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+   687	            >
+   688	              {/* Top Gestores */}
+   689	              <div className="p-6 rounded-xl" 
+   690	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   691	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   692	                  <Users size={18} style={{ color: colors.secondary }} />
+   693	                  Top Gestores
+   694	                </h3>
+   695	                <BarChart
+   696	                  data={data.topGestores}
+   697	                  maxValue={data.topGestores[0]?.count || 1}
+   698	                  labelKey="name"
+   699	                  valueKey="count"
+   700	                  color={colors.secondary}
+   701	                />
+   702	              </div>
+   703	              
+   704	              {/* Distribution by Days */}
+   705	              <div className="p-6 rounded-xl" 
+   706	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   707	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   708	                  <Clock size={18} style={{ color: colors.warning }} />
+   709	                  Distribución por Rango de Días
+   710	                </h3>
+   711	                <BarChart
+   712	                  data={Object.entries(statsFiltrados.porRangoDias)
+   713	                    .filter(([key]) => key)
+   714	                    .sort((a, b) => b[1] - a[1])
+   715	                    .map(([name, count]) => ({ name, count }))}
+   716	                  maxValue={Math.max(...Object.values(statsFiltrados.porRangoDias))}
+   717	                  labelKey="name"
+   718	                  valueKey="count"
+   719	                  color={colors.warning}
+   720	                />
+   721	              </div>
+   722	              
+   723	              {/* Subseries Distribution */}
+   724	              <div className="lg:col-span-2 p-6 rounded-xl" 
+   725	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   726	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   727	                  <PieChart size={18} style={{ color: colors.accent }} />
+   728	                  Distribución por Subserie (Top 15)
+   729	                </h3>
+   730	                <BarChart
+   731	                  data={Object.entries(statsFiltrados.porSubserie)
+   732	                    .filter(([key]) => key)
+   733	                    .sort((a, b) => b[1] - a[1])
+   734	                    .slice(0, 15)
+   735	                    .map(([name, count]) => ({ name, count }))}
+   736	                  maxValue={Math.max(...Object.values(statsFiltrados.porSubseries || {}))}
+   737	                  labelKey="name"
+   738	                  valueKey="count"
+   739	                  color={colors.accent}
+   740	                  maxItems={15}
+   741	                />
+   742	              </div>
+   743	            </motion.div>
+   744	          )}
+   745	          
+   746	          {activeTab === 'alerts' && (
+   747	            <motion.div
+   748	              key="alerts"
+   749	              initial={{ opacity: 0 }}
+   750	              animate={{ opacity: 1 }}
+   751	              exit={{ opacity: 0 }}
+   752	              className="space-y-4"
+   753	            >
+   754	              <div className="p-6 rounded-xl" 
+   755	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   756	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   757	                  <Bell size={18} style={{ color: colors.danger }} />
+   758	                  Alertas Automáticas
+   759	                </h3>
+   760	                <p className="text-sm mb-4" style={{ color: colors.textMuted }}>
+   761	                  Sistema de monitoreo en tiempo real. Las alertas se generan automáticamente cuando se detectan condiciones críticas.
+   762	                </p>
+   763	                
+   764	                <div className="space-y-3">
+   765	                  {alertas.map((alerta, index) => (
+   766	                    <AlertItem key={index} {...alerta} />
+   767	                  ))}
+   768	                  
+   769	                  {alertas.length === 0 && (
+   770	                    <div className="p-4 rounded-lg text-center" style={{ backgroundColor: `${colors.success}20` }}>
+   771	                      <p className="text-sm" style={{ color: colors.success }}>
+   772	                        ✓ No hay alertas activas en este momento
+   773	                      </p>
+   774	                    </div>
+   775	                  )}
+   776	                </div>
+   777	              </div>
+   778	              
+   779	              {/* Additional Alerts */}
+   780	              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   781	                <div className="p-4 rounded-xl" style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   782	                  <h4 className="font-semibold text-sm mb-2" style={{ color: colors.text }}>
+   783	                    Documentos Críticos (+1000 días)
+   784	                  </h4>
+   785	                  <p className="text-2xl font-bold" style={{ color: colors.danger }}>
+   786	                    {statsFiltrados.porRangoDias['L.más de 1000 días']?.toLocaleString() || 0}
+   787	                  </p>
+   788	                  <p className="text-xs mt-1" style={{ color: colors.textMuted }}>
+   789	                    Documentos que requieren intervención urgente
+   790	                  </p>
+   791	                </div>
+   792	                
+   793	                <div className="p-4 rounded-xl" style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   794	                  <h4 className="font-semibold text-sm mb-2" style={{ color: colors.text }}>
+   795	                    Tasa de Resolución
+   796	                  </h4>
+   797	                  <p className="text-2xl font-bold" style={{ color: colors.success }}>
+   798	                    {((statsFiltrados.documentosPendientes / (statsFiltrados.total || 1)) * 100).toFixed(1)}%
+   799	                  </p>
+   800	                  <p className="text-xs mt-1" style={{ color: colors.textMuted }}>
+   801	                    Documentos con plazo vigente
+   802	                  </p>
+   803	                </div>
+   804	              </div>
+   805	            </motion.div>
+   806	          )}
+   807	          
+   808	          {activeTab === 'export' && (
+   809	            <motion.div
+   810	              key="export"
+   811	              initial={{ opacity: 0 }}
+   812	              animate={{ opacity: 1 }}
+   813	              exit={{ opacity: 0 }}
+   814	              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+   815	            >
+   816	              {/* Export Options */}
+   817	              <div className="p-6 rounded-xl" 
+   818	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   819	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   820	                  <Download size={18} style={{ color: colors.secondary }} />
+   821	                  Exportar Reportes
+   822	                </h3>
+   823	                
+   824	                <div className="space-y-3">
+   825	                  <button
+   826	                    onClick={() => exportToCSV(documentosFiltrados, 'PQRSD_Completo')}
+   827	                    className="w-full p-4 rounded-lg flex items-center gap-3 transition-colors hover:opacity-90"
+   828	                    style={{ backgroundColor: colors.secondary, color: 'white' }}
+   829	                  >
+   830	                    <FileSpreadsheet size={20} />
+   831	                    <div className="text-left">
+   832	                      <p className="font-medium">Exportar CSV Completo</p>
+   833	                      <p className="text-xs opacity-80">
+   834	                        {documentosFiltrados.length.toLocaleString()} documentos filtrados
+   835	                      </p>
+   836	                    </div>
+   837	                  </button>
+   838	                  
+   839	                  <button
+   840	                    onClick={() => exportToCSV(
+   841	                      documentosFiltrados.filter(d => d.dias > 1000), 
+   842	                      'PQRSD_Criticos'
+   843	                    )}
+   844	                    className="w-full p-4 rounded-lg flex items-center gap-3 transition-colors hover:opacity-90"
+   845	                    style={{ backgroundColor: colors.danger, color: 'white' }}
+   846	                  >
+   847	                    <AlertTriangle size={20} />
+   848	                    <div className="text-left">
+   849	                      <p className="font-medium">Exportar Documentos Críticos</p>
+   850	                      <p className="text-xs opacity-80">
+   851	                        Documentos con +1000 días de trámite
+   852	                      </p>
+   853	                    </div>
+   854	                  </button>
+   855	                  
+   856	                  <button
+   857	                    onClick={() => exportToCSV(
+   858	                      documentosFiltrados.filter(d => d.fechaVencimiento && new Date(d.fechaVencimiento) < new Date()), 
+   859	                      'PQRSD_Vencidos'
+   860	                    )}
+   861	                    className="w-full p-4 rounded-lg flex items-center gap-3 transition-colors hover:opacity-90"
+   862	                    style={{ backgroundColor: colors.warning, color: 'white' }}
+   863	                  >
+   864	                    <Clock size={20} />
+   865	                    <div className="text-left">
+   866	                      <p className="font-medium">Exportar Vencidos</p>
+   867	                      <p className="text-xs opacity-80">
+   868	                        Documentos con fecha de vencimiento pasada
+   869	                      </p>
+   870	                    </div>
+   871	                  </button>
+   872	                </div>
+   873	              </div>
+   874	              
+   875	              {/* Summary for Presentation */}
+   876	              <div className="p-6 rounded-xl" 
+   877	                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.border}` }}>
+   878	                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+   879	                  <Building2 size={18} style={{ color: colors.accent }} />
+   880	                  Resumen para Presentación
+   881	                </h3>
+   882	                
+   883	                <div className="space-y-4">
+   884	                  <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+   885	                    <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Total de Documentos</p>
+   886	                    <p className="text-xl font-bold" style={{ color: colors.text }}>
+   887	                      {statsFiltrados.total.toLocaleString()}
+   888	                    </p>
+   889	                  </div>
+   890	                  
+   891	                  <div className="grid grid-cols-2 gap-3">
+   892	                    <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+   893	                      <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Vencidos</p>
+   894	                      <p className="text-lg font-bold" style={{ color: colors.danger }}>
+   895	                        {statsFiltrados.documentosVencidos.toLocaleString()}
+   896	                      </p>
+   897	                    </div>
+   898	                    <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+   899	                      <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Pendientes</p>
+   900	                      <p className="text-lg font-bold" style={{ color: colors.warning }}>
+   901	                        {statsFiltrados.documentosPendientes.toLocaleString()}
+   902	                      </p>
+   903	                    </div>
+   904	                  </div>
+   905	                  
+   906	                  <div className="p-3 rounded-lg" style={{ backgroundColor: colors.bg }}>
+   907	                    <p className="text-xs font-medium" style={{ color: colors.textMuted }}>Promedio de Días</p>
+   908	                    <p className="text-lg font-bold" style={{ color: colors.success }}>
+   909	                      {statsFiltrados.diasPromedio} días
+   910	                    </p>
+   911	                  </div>
+   912	                  
+   913	                  <div className="p-3 rounded-lg" style={{ backgroundColor: `${colors.accent}20` }}>
+   914	                    <p className="text-xs font-medium" style={{ color: colors.accent }}>
+   915	                      Generado: {new Date().toLocaleDateString('es-CO')} - {new Date().toLocaleTimeString('es-CO')}
+   916	                    </p>
+   917	                  </div>
+   918	                </div>
+   919	              </div>
+   920	            </motion.div>
+   921	          )}
+   922	        </AnimatePresence>
+   923	      </main>
+   924	      
+   925	      {/* Footer */}
+   926	      <footer className="border-t mt-8 py-4" style={{ borderColor: colors.border }}>
+   927	        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
+   928	          <p className="text-xs" style={{ color: colors.textMuted }}>
+   929	            Dashboard PQRSD v1.0 - Ministerio del Interior
+   930	          </p>
+   931	          <p className="text-xs" style={{ color: colors.textMuted }}>
+   932	            Actualizado: {new Date().toLocaleString('es-CO')}
+   933	          </p>
+   934	        </div>
+   935	      </footer>
+   936	    </div>
+   937	  );
+   938	}

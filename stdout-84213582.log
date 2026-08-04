@@ -1,0 +1,115 @@
+              {/* Detail KPI Cards - Shown when a dependency is selected */}
+              {filtros.dependencia && (() => {
+                // Compute stats for selected dependency
+                const depDocs = data.documentos.filter(d => d.dependencia === filtros.dependencia);
+                const depTotal = depDocs.length;
+                const depVencidos = depDocs.filter(d => d.fechaVencimiento && new Date(d.fechaVencimiento) < new Date()).length;
+                const depPendientes = depDocs.filter(d => d.fechaVencimiento && new Date(d.fechaVencimiento) >= new Date()).length;
+                const depDias = depDocs.filter(d => d.dias > 0);
+                const depPromedio = depDias.length > 0 ? Math.round(depDias.reduce((s, d) => s + d.dias, 0) / depDias.length) : 0;
+                const depPqrsdf = depDocs.filter(d => d.clasificacion === 'PQRSDF').length;
+                const depTramite = depDocs.filter(d => d.clasificacion === 'TRAMITE').length;
+                const depOtras = depDocs.filter(d => d.clasificacion === 'OTRAS').length;
+
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4"
+                  >
+                    {/* Selected Dependency Name */}
+                    <div className="p-4 rounded-xl flex items-center gap-3"
+                         style={{ backgroundColor: `${colors.softRed}08`, border: `1px solid ${colors.softRed}25` }}>
+                      <Building2 size={20} style={{ color: colors.softRed }} />
+                      <div>
+                        <p className="text-sm" style={{ color: colors.textMuted }}>Dependencia seleccionada</p>
+                        <p className="font-bold" style={{ color: colors.softRed }}>{filtros.dependencia}</p>
+                      </div>
+                    </div>
+
+                    {/* Main KPIs for this dependency */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <KPICard
+                        title="Total Documentos"
+                        value={depTotal.toLocaleString()}
+                        icon={FileText}
+                        color={colors.softRed}
+                        subtitle="En esta dependencia"
+                      />
+                      <KPICard
+                        title="Vencidos"
+                        value={depVencidos.toLocaleString()}
+                        icon={AlertTriangle}
+                        color={colors.danger}
+                        subtitle="Requieren atención"
+                      />
+                      <KPICard
+                        title="Pendientes"
+                        value={depPendientes.toLocaleString()}
+                        icon={Clock}
+                        color={colors.warning}
+                        subtitle="En proceso"
+                      />
+                      <KPICard
+                        title="Promedio Días"
+                        value={depPromedio}
+                        icon={Activity}
+                        color={colors.softRedLight}
+                        subtitle="Tiempo promedio"
+                      />
+                    </div>
+
+                    {/* Classification KPIs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="p-5 rounded-xl"
+                           style={{ backgroundColor: colors.card, border: `1px solid ${colors.cardBorder}` }}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                               style={{ backgroundColor: `${colors.softRed}12` }}>
+                            <FileText size={18} style={{ color: colors.softRed }} />
+                          </div>
+                          <p className="text-sm font-medium" style={{ color: colors.textMuted }}>PQRSDF</p>
+                        </div>
+                        <p className="text-2xl font-bold" style={{ color: colors.softRed }}>
+                          {depPqrsdf.toLocaleString()}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: colors.textMuted }}>
+                          {depTotal > 0 ? ((depPqrsdf / depTotal) * 100).toFixed(1) : 0}% del total
+                        </p>
+                      </div>
+                      <div className="p-5 rounded-xl"
+                           style={{ backgroundColor: colors.card, border: `1px solid ${colors.cardBorder}` }}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                               style={{ backgroundColor: `${colors.softRed}12` }}>
+                            <FileSpreadsheet size={18} style={{ color: colors.softRed }} />
+                          </div>
+                          <p className="text-sm font-medium" style={{ color: colors.textMuted }}>TRÁMITE</p>
+                        </div>
+                        <p className="text-2xl font-bold" style={{ color: colors.softRed }}>
+                          {depTramite.toLocaleString()}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: colors.textMuted }}>
+                          {depTotal > 0 ? ((depTramite / depTotal) * 100).toFixed(1) : 0}% del total
+                        </p>
+                      </div>
+                      <div className="p-5 rounded-xl"
+                           style={{ backgroundColor: colors.card, border: `1px solid ${colors.cardBorder}` }}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                               style={{ backgroundColor: `${colors.softRed}12` }}>
+                            <FileText size={18} style={{ color: colors.softRed }} />
+                          </div>
+                          <p className="text-sm font-medium" style={{ color: colors.textMuted }}>OTRAS</p>
+                        </div>
+                        <p className="text-2xl font-bold" style={{ color: colors.softRed }}>
+                          {depOtras.toLocaleString()}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: colors.textMuted }}>
+                          {depTotal > 0 ? ((depOtras / depTotal) * 100).toFixed(1) : 0}% del total
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })()}

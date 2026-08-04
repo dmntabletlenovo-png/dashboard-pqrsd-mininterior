@@ -1,0 +1,161 @@
+        tipo: 'warning' as const,
+        fecha: 'Alerta automática'
+      });
+    }
+    
+    // Alert for pending documents
+    if (statsFiltrados.documentosPendientes > 1000) {
+      alerts.push({
+        titulo: 'Volumen alto de documentos pendientes',
+        descripcion: `${statsFiltrados.documentosPendientes.toLocaleString()} documentos con fecha de vencimiento por vencer.`,
+        tipo: 'warning' as const,
+        fecha: 'Monitoreo en tiempo real'
+      });
+    }
+    
+    return alerts;
+  }, [documentosFiltrados, statsFiltrados]);
+  
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: colors.bg }}>
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b" 
+              style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.secondary}20` }}>
+                <FileText size={24} style={{ color: colors.secondary }} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold" style={{ color: colors.text }}>
+                  Dashboard PQRSD
+                </h1>
+                <p className="text-xs" style={{ color: colors.textMuted }}>
+                  Ministerio del Interior - Asuntos Indígenas, ROM y Minorías
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" 
+                   style={{ backgroundColor: `${colors.success}20` }}>
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: colors.success }} />
+                <span className="text-xs font-medium" style={{ color: colors.success }}>En tiempo real</span>
+              </div>
+              
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                style={{ 
+                  backgroundColor: showFilters ? colors.secondary : 'transparent',
+                  color: showFilters ? 'white' : colors.textMuted,
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                <Filter size={16} />
+                <span className="text-sm">Filtros</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* Filters Panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-b"
+            style={{ backgroundColor: colors.card, borderColor: colors.border }}
+          >
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Serie Documental
+                  </label>
+                  <select
+                    value={filtros.serie}
+                    onChange={(e) => setFiltros({ ...filtros, serie: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porSerie).sort().map(serie => (
+                      <option key={serie} value={serie}>{serie}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Rango de Días
+                  </label>
+                  <select
+                    value={filtros.rangoDias}
+                    onChange={(e) => setFiltros({ ...filtros, rangoDias: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todos</option>
+                    {Object.keys(data.estadisticas.porRangoDias).filter(r => r).map(rango => (
+                      <option key={rango} value={rango}>{rango}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Oficina
+                  </label>
+                  <select
+                    value={filtros.oficina}
+                    onChange={(e) => setFiltros({ ...filtros, oficina: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porOficina).sort().map(oficina => (
+                      <option key={oficina} value={oficina}>{oficina}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Búsqueda
+                  </label>
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" 
+                            style={{ color: colors.textMuted }} />
+                    <input
+                      type="text"
+                      value={filtros.busqueda}
+                      onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
+                      placeholder="Buscar por asunto, radicado o firmante..."
+                      className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-xs" style={{ color: colors.textMuted }}>
+                  Mostrando {documentosFiltrados.length.toLocaleString()} de {data.estadisticas.total.toLocaleString()} documentos
+                </p>
+                <button
+                  onClick={() => setFiltros({ serie: '', subserie: '', oficina: '', rangoDias: '', busqueda: '' })}
+                  className="text-xs px-3 py-1 rounded"
+                  style={{ color: colors.secondary }}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>

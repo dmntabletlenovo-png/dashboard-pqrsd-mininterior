@@ -1,0 +1,96 @@
+          {activeTab === 'dependencias' && (
+            <motion.div
+              key="dependencias"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {/* Top 20 Dependencias Panel */}
+              <div className="p-6 rounded-xl"
+                   style={{ backgroundColor: colors.card, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 0 15px ${colors.softRed}10` }}>
+                <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+                  <Building2 size={18} style={{ color: colors.softRed }} />
+                  Top 20 Dependencias
+                  {filtros.dependencia && (
+                    <span className="ml-2 text-xs px-2 py-1 rounded-full"
+                          style={{ backgroundColor: `${colors.softRed}30`, color: colors.softRed }}>
+                      Filtrado: {filtros.dependencia}
+                    </span>
+                  )}
+                </h3>
+                <p className="text-sm mb-4" style={{ color: colors.textMuted }}>
+                  Haz clic en una dependencia para filtrar el dashboard. Se muestran las {topDependencias.length} dependencias con más documentos.
+                </p>
+                
+                <div className="space-y-2">
+                  {topDependencias.map((dep, index) => {
+                    const maxCount = topDependencias[0]?.count || 1;
+                    const percentage = (dep.count / maxCount) * 100;
+                    const isSelected = filtros.dependencia === dep.name;
+                    
+                    return (
+                      <motion.div
+                        key={dep.name}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        onClick={() => setFiltros({
+                          ...filtros,
+                          dependencia: isSelected ? '' : dep.name
+                        })}
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${isSelected ? 'ring-2' : 'hover:scale-[1.01]'}`}
+                        style={{
+                          backgroundColor: isSelected ? `${colors.softRed}25` : colors.softRedDark,
+                          borderColor: isSelected ? colors.softRed : 'transparent',
+                          ringColor: isSelected ? colors.softRed : undefined
+                        }}
+                      >
+                        <span className="text-xs font-bold w-6 text-center" style={{ color: colors.softRed }}>
+                          {index + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: colors.text }}>
+                            {dep.name}
+                          </p>
+                          <div className="mt-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${colors.softRed}15` }}>
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percentage}%` }}
+                              transition={{ duration: 0.8, delay: index * 0.05 }}
+                              className="h-full rounded-full"
+                              style={{ backgroundColor: isSelected ? colors.softRed : colors.softRedLight }}
+                            />
+                          </div>
+                        </div>
+                        <div className="text-right ml-3">
+                          <p className="text-lg font-bold" style={{ color: colors.softRed }}>
+                            {dep.count.toLocaleString()}
+                          </p>
+                          <p className="text-xs" style={{ color: colors.textMuted }}>
+                            {((dep.count / documentosFiltrados.length) * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Summary Stats for Dependencias */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-5 rounded-xl"
+                     style={{ backgroundColor: colors.card, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 0 15px ${colors.softRed}10` }}>
+                  <p className="text-sm" style={{ color: colors.textMuted }}>Total Dependencias</p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: colors.softRed }}>
+                    {uniqueDependencias.length}
+                  </p>
+                </div>
+                <div className="p-5 rounded-xl"
+                     style={{ backgroundColor: colors.card, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 0 15px ${colors.softRed}10` }}>
+                  <p className="text-sm" style={{ color: colors.textMuted }}>Documentos Filtrados</p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: colors.softRed }}>
+                    {documentosFiltrados.length.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-5 rounded-xl"

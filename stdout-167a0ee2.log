@@ -1,0 +1,119 @@
+      {/* Filters Panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-b"
+            style={{ backgroundColor: colors.card, borderColor: colors.cardBorder, boxShadow: `0 2px 8px rgba(0,0,0,0.04)` }}
+          >
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Serie Documental
+                  </label>
+                  <select
+                    value={filtros.serie}
+                    onChange={(e) => setFiltros({ ...filtros, serie: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 2px 12px rgba(0,0,0,0.06)` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porSerie).sort().map(serie => (
+                      <option key={serie} value={serie}>{serie}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Rango de Días
+                  </label>
+                  <select
+                    value={filtros.rangoDias}
+                    onChange={(e) => setFiltros({ ...filtros, rangoDias: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 2px 12px rgba(0,0,0,0.06)` }}
+                  >
+                    <option value="">Todos</option>
+                    {Object.keys(data.estadisticas.porRangoDias).filter(r => r).map(rango => (
+                      <option key={rango} value={rango}>{rango}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Oficina
+                  </label>
+                  <select
+                    value={filtros.oficina}
+                    onChange={(e) => setFiltros({ ...filtros, oficina: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 2px 12px rgba(0,0,0,0.06)` }}
+                  >
+                    <option value="">Todas</option>
+                    {Object.keys(data.estadisticas.porOficina).sort().map(oficina => (
+                      <option key={oficina} value={oficina}>{oficina}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Dependencia
+                  </label>
+                  <select
+                    value={filtros.dependencia}
+                    onChange={(e) => setFiltros({ ...filtros, dependencia: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 2px 12px rgba(0,0,0,0.06)` }}
+                  >
+                    <option value="">Todas</option>
+                    {uniqueDependencias.map(dep => (
+                      <option key={dep} value={dep}>{dep}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1" style={{ color: colors.textMuted }}>
+                    Búsqueda
+                  </label>
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" 
+                            style={{ color: colors.textMuted }} />
+                    <input
+                      type="text"
+                      value={filtros.busqueda}
+                      onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
+                      placeholder="Buscar por asunto, radicado o firmante..."
+                      className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.cardBorder}`, boxShadow: `0 2px 12px rgba(0,0,0,0.06)` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-xs" style={{ color: colors.textMuted }}>
+                  Mostrando {documentosFiltrados.length.toLocaleString()} de {data.estadisticas.total.toLocaleString()} documentos
+                </p>
+                <button
+                  onClick={() => setFiltros({ serie: '', subserie: '', oficina: '', rangoDias: '', busqueda: '', dependencia: '' })}
+                  className="text-xs px-3 py-1 rounded"
+                  style={{ color: colors.softRed }}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* KPI Cards */}

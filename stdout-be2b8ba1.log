@@ -1,0 +1,201 @@
+  const totalDocs = stats.total;
+  
+  return (
+    <div className="space-y-4">
+      <div className="p-4 rounded-lg" style={{ backgroundColor: `${colors.primary}40` }}>
+        <h4 className="font-semibold mb-2" style={{ color: colors.accent }}>Resumen Ejecutivo - Q3 2026</h4>
+        <p className="text-sm" style={{ color: colors.textMuted }}>
+          Se han registrado un total de <strong style={{ color: colors.text }}>{totalDocs.toLocaleString()}</strong> documentos 
+          en el sistema PQRSD. El {((stats.porSerie['DERECHOS DE PETICION'] || 0) / totalDocs * 100).toFixed(1)}% corresponden 
+          a Derechos de Petición, seguido por Comunicaciones Oficiales ({((stats.porSerie['COMUNICACIONES'] || 0) / totalDocs * 100).toFixed(1)}%).
+        </p>
+      </div>
+      
+      <div className="space-y-2">
+        <h5 className="font-semibold text-sm" style={{ color: colors.text }}>Top 5 Series Documentales:</h5>
+        {topSeries.map(([serie, count], index) => (
+          <div key={index} className="flex items-center justify-between p-2 rounded" 
+               style={{ backgroundColor: colors.card }}>
+            <span className="text-xs" style={{ color: colors.textMuted }}>{serie}</span>
+            <span className="text-sm font-bold" style={{ color: colors.secondary }}>
+              {((count as number) / totalDocs * 100).toFixed(1)}%
+            </span>
+          </div>
+        ))}
+      </div>
+      
+      <div className="p-3 rounded-lg" style={{ backgroundColor: `${colors.success}20` }}>
+        <p className="text-xs" style={{ color: colors.success }}>
+          ✓ Promedio de días de procesamiento: {stats.diasPromedio} días
+        </p>
+        <p className="text-xs mt-1" style={{ color: colors.success }}>
+          ✓ Documentos en rango crítico (+1000 días): {stats.porRangoDias['L.más de 1000 días']?.toLocaleString() || 0}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Export Function
+const exportToCSV = (documentos: DocumentoPQRSD[], filename: string) => {
+  const headers = ['ID', 'Radicado', 'Fecha Radicación', 'Serie', 'Subserie', 'Tipología', 'Clasificación', 'Asunto', 'Estado', 'Oficina', 'Gestor', 'Días', 'Rangos'];
+  const rows = documentos.map(doc => [
+    doc.id, doc.radicado, doc.fechaRadicacion, doc.serie, doc.subserie, 
+    doc.tipologia, doc.clasificacion, `"${doc.asunto.replace(/"/g, '""')}"`, 
+    doc.estado, doc.oficina, doc.gestor, doc.dias, doc.rangos
+  ]);
+  
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+};
+
+// Main Dashboard Component
+export default function Dashboard() {
+  const [filtros, setFiltros] = useState<Filtros>({
+    serie: '',
+    subserie: '',
+    oficina: '',
+    rangoDias: '',
+    busqueda: ''
+  });
+  
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'analysis' | 'alerts' | 'export'>('overview');
+  
+  // Apply filters
+  const documentosFiltrados = useMemo(() => {
+    return data.documentos.filter(doc => {
+      if (filtros.serie && !doc.serie.includes(filtros.serie)) return false;
+      if (filtros.subserie && !doc.subserie.includes(filtros.subserie)) return false;
+      if (filtros.oficina && !doc.oficina.includes(filtros.oficina)) return false;
+      if (filtros.rangoDias && doc.rangos !== filtros.rangoDias) return false;
+      if (filtros.busqueda) {
+        const searchLower = filtros.busqueda.toLowerCase();
+        if (!doc.asunto.toLowerCase().includes(searchLower) && 
+            !doc.radicado.toLowerCase().includes(searchLower) &&
+            !doc.firmante.toLowerCase().includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [filtros]);
+  
+  // Filtered stats
+  const statsFiltrados = useMemo(() => {
+    const stats = {
+      total: documentosFiltrados.length,
+      documentosVencidos: 0,
+      documentosPendientes: 0,
+      diasPromedio: 0,
+      porSerie: {} as Record<string, number>,
+      porSubserie: {} as Record<string, number>,
+      porOficina: {} as Record<string, number>,
+      porRangoDias: {} as Record<string, number>
+    };
+    
+    let totalDias = 0;
+    let countDias = 0;
+    
+    documentosFiltrados.forEach(doc => {
+      stats.porSerie[doc.serie] = (stats.porSerie[doc.serie] || 0) + 1;
+      stats.porSubserie[doc.subserie] = (stats.porSubserie[doc.subserie] || 0) + 1;
+      stats.porOficina[doc.oficina] = (stats.porOficina[doc.oficina] || 0) + 1;
+      stats.porRangoDias[doc.rangos] = (stats.porRangoDias[doc.rangos] || 0) + 1;
+      
+      if (doc.dias > 0) {
+        totalDias += doc.dias;
+        countDias++;
+      }
+      
+      if (doc.fechaVencimiento) {
+        const vencimiento = new Date(doc.fechaVencimiento);
+        if (vencimiento < new Date()) {
+          stats.documentosVencidos++;
+        } else {
+          stats.documentosPendientes++;
+        }
+      }
+    });
+    
+    stats.diasPromedio = countDias > 0 ? Math.round(totalDias / countDias) : 0;
+    
+    return stats;
+  }, [documentosFiltrados]);
+  
+  // Alerts based on data
+  const alertas = useMemo(() => {
+    const alerts = [];
+    
+    // Alert for documents over 1000 days
+    const docsOver1000 = documentosFiltrados.filter(d => d.dias > 1000).length;
+    if (docsOver1000 > 0) {
+      alerts.push({
+        titulo: 'Documentos con más de 1000 días de trámite',
+        descripcion: `Hay ${docsOver1000.toLocaleString()} documentos que llevan más de 1000 días sin resolver. Se requiere atención inmediata.`,
+        tipo: 'danger' as const,
+        fecha: 'Revisión continua'
+      });
+    }
+    
+    // Alert for high volume series
+    const topSeries = Object.entries(statsFiltrados.porSerie).sort((a, b) => b[1] - a[1])[0];
+    if (topSeries) {
+      alerts.push({
+        titulo: `Alta demanda en: ${topSeries[0]}`,
+        descripcion: `${topSeries[1].toLocaleString()} documentos en esta serie. Considerar asignar más recursos.`,
+        tipo: 'warning' as const,
+        fecha: 'Alerta automática'
+      });
+    }
+    
+    // Alert for pending documents
+    if (statsFiltrados.documentosPendientes > 1000) {
+      alerts.push({
+        titulo: 'Volumen alto de documentos pendientes',
+        descripcion: `${statsFiltrados.documentosPendientes.toLocaleString()} documentos con fecha de vencimiento por vencer.`,
+        tipo: 'warning' as const,
+        fecha: 'Monitoreo en tiempo real'
+      });
+    }
+    
+    return alerts;
+  }, [documentosFiltrados, statsFiltrados]);
+  
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: colors.bg }}>
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b" 
+              style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg" style={{ backgroundColor: `${colors.secondary}20` }}>
+                <FileText size={24} style={{ color: colors.secondary }} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold" style={{ color: colors.text }}>
+                  Dashboard PQRSD
+                </h1>
+                <p className="text-xs" style={{ color: colors.textMuted }}>
+                  Ministerio del Interior - Asuntos Indígenas, ROM y Minorías
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" 
+                   style={{ backgroundColor: `${colors.success}20` }}>
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: colors.success }} />
+                <span className="text-xs font-medium" style={{ color: colors.success }}>En tiempo real</span>
+              </div>
+              
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                style={{ 
+                  backgroundColor: showFilters ? colors.secondary : 'transparent',
